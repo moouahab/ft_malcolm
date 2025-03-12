@@ -47,3 +47,34 @@ void *ft_memset(void *s, int c, size_t n)
         dst[i + tail] = (unsigned char)c;
     return s;
 }
+
+int	ft_memcmp(const void	*ptr1, const void	*ptr2, size_t num)
+{
+	const unsigned char	*s1;
+	const unsigned char	*s2;
+
+	s1 = ptr1;
+	s2 = ptr2;
+	while (num-- > 0)
+	{
+		if (*s1 != *s2)
+			return ((int)(*s1 - *s2));
+		s1++;
+		s2++;
+	}
+	return (0);
+}
+
+void	*ft_memcpy(void	*dest, const void	*src, size_t n)
+{
+	char	*dst;
+	char	*sc;
+
+	dst = (char *)dest;
+	sc = (char *)src;
+	if (!dest && !src)
+		return (NULL);
+	while (n-- > 0)
+		*dst++ = *sc++;
+	return (dest);
+}

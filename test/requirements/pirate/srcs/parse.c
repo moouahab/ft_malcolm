@@ -59,7 +59,7 @@ bool parsing_arg(int ac, char **av, t_arp_packet *arp_reponse)
     }
     
     /* Initialisation complète de la structure */
-    memset(arp_reponse, 0, sizeof(t_arp_packet));
+    ft_memset(arp_reponse, 0, sizeof(t_arp_packet));
     arp_reponse->htype = htons(1);
     arp_reponse->ptype = htons(0x0800);
     arp_reponse->hlen = 6;
@@ -70,6 +70,12 @@ bool parsing_arg(int ac, char **av, t_arp_packet *arp_reponse)
         !parsing_mac(av[2], arp_reponse->sender_mac) ||
         !parsing_ip(av[3], arp_reponse->target_ip) ||
         !parsing_mac(av[4], arp_reponse->target_mac)) {
+        return false;
+    }
+
+    /* Ajout pour s'assurer que l'entrée ARP n'est pas invalidée */
+    if (ft_memcmp(arp_reponse->target_mac, "\x00\x00\x00\x00\x00\x00", 6) == 0) {
+        fprintf(stderr, "[ERREUR] L'adresse MAC cible ne peut pas être vide !\n");
         return false;
     }
     return true;

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  pirate:
+    build: ./requirements/pirate
+    container_name: pirate
+    privileged: true
+    networks:
+      test_network:
+        ipv4_address: 172.18.0.2
+    stdin_open: true
+    tty: true
+
+  victim:
+    build: ./requirements/victim
+    container_name: victim
+    privileged: true
+    networks:
+      test_network:
+        ipv4_address: 172.18.0.4
+    stdin_open: true
+    tty: true
+
+  router:
+    build: ./requirements/router
+    container_name: router
+    privileged: true
+    networks:
+      test_network:
+        ipv4_address: 172.18.0.3
+    stdin_open: true
+    tty: true
+
+networks:
+  test_network:
+    driver: macvlan
+    driver_opts:
+      parent: eth0
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16

