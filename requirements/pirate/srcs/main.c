@@ -33,25 +33,24 @@ char *get_active_interface(void)
         interface_name[IFNAMSIZ - 1] = '\0';
         return interface_name;
     }
-
     interface_name[0] = '\0';
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_PACKET) {
-            if ((ifa->ifa_flags & IFF_UP) && !(ifa->ifa_flags & IFF_LOOPBACK)) {
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_PACKET)
+            if ((ifa->ifa_flags & IFF_UP) && !(ifa->ifa_flags & IFF_LOOPBACK))
+            {
                 ft_strncpy(interface_name, ifa->ifa_name, IFNAMSIZ - 1);
                 interface_name[IFNAMSIZ - 1] = '\0';
                 break;
             }
-        }
     }
     freeifaddrs(ifaddr);
-
     if (interface_name[0] == '\0')
         ft_strncpy(interface_name, "eth0", IFNAMSIZ);
     return interface_name;
 }
 
-void print_arp_packet(const t_arp_packet *arp_pkt) 
+void    print_arp_packet(const t_arp_packet *arp_pkt) 
 {
     char sender_ip[INET_ADDRSTRLEN], target_ip[INET_ADDRSTRLEN];
 
@@ -77,6 +76,7 @@ void print_arp_packet(const t_arp_packet *arp_pkt)
     printf("===========================\n\n");
 }
 
+
 void print_ethernet_frame(const t_ethernet_frame *frame)
 {
     printf("\n===== Trame Ethernet =====\n");
@@ -98,7 +98,8 @@ ssize_t send_arp_frame(int sock_raw, const t_ethernet_frame *frame, const char *
     struct ifreq ifr = {0};
 
     ft_strncpy(ifr.ifr_name, iface, IFNAMSIZ - 1);
-    if (ioctl(sock_raw, SIOCGIFINDEX, &ifr) == -1) {
+    if (ioctl(sock_raw, SIOCGIFINDEX, &ifr) == -1)
+    {
         fprintf(stderr, "ioctl SIOCGIFINDEX");
         return -1;
     }
@@ -130,10 +131,10 @@ t_arp_packet build_arp_reply(const t_arp_packet *arp_request,
     t_arp_packet reply;
 
     // 1. Remplir les champs de base
-    reply.htype  = htons(1);        // Ethernet
-    reply.ptype  = htons(0x0800);   // IPv4
-    reply.hlen   = 6;               // Taille MAC
-    reply.plen   = 4;               // Taille IP
+    reply.htype  = htons(1);
+    reply.ptype  = htons(0x0800);
+    reply.hlen   = 6;
+    reply.plen   = 4;
     reply.opcode = htons(ARPOP_REPLY);
 
     ft_memcpy(reply.sender_ip,  user_input->sender_ip,  4);
@@ -148,9 +149,11 @@ t_arp_packet build_arp_reply(const t_arp_packet *arp_request,
 
 int main(int argc, char *argv[])
 {
-    char buffer[BUF_REQUEST];
-    ssize_t recv_len;
-    t_arp_packet reponse;
+    char            buffer[BUF_REQUEST];
+    char            *iface;
+    ssize_t         recv_len;
+    t_arp_packet    reponse;
+    t_arp_packet    *arp_pkt;
 
     signal(SIGINT, sigint_handler);
     if (!parsing_arg(argc, argv, &reponse))
@@ -161,21 +164,18 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     g_sock_raw = sock_raw;
-    char *iface = get_active_interface();
+    iface = get_active_interface();
     printf("[INFO] Active interface: %s\n", iface);
     printf("[INFO] En attente d'une requête ARP...\n");
     while (true)
     {
         // 1. Récupérer un paquet Ethernet
         recv_len = recvfrom(sock_raw, buffer, sizeof(buffer), 0, NULL, NULL);
-        if (recv_len < 0) {
-            perror("recvfrom");
+        if (recv_len < 0)
             continue ;
-        }
         if (recv_len < (ssize_t)(ETH_HLEN + sizeof(t_arp_packet)))
             continue ;
-        
-        t_arp_packet *arp_pkt = (t_arp_packet *)(buffer + ETH_HLEN);
+        arp_pkt = (t_arp_packet *)(buffer + ETH_HLEN);
         if (get_arp_request(arp_pkt, argv[1]))
         {
             printf("[INFO] Requête ARP détectée ! On va envoyer un ARP Reply...\n");

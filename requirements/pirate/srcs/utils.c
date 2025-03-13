@@ -33,13 +33,12 @@ bool get_arp_request(const t_arp_packet *arp_pkt, const char *target_ip)
 
     if (ntohs(arp_pkt->opcode) == ARPOP_REQUEST) 
     {
-		printf("requested_ip == %s && target_ip == %s\n", requested_ip, target_ip);
         if (ft_strcmp(requested_ip, target_ip) == 0) 
         {
             printf("[INFO] Requête ARP détectée de %s (cherche %s)\n", sender_ip, requested_ip);
-            return true;
+            return (true);
         }
     }
 
-    return false;
+    return (false);
 }
