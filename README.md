@@ -39,16 +39,22 @@ Le programme prend **quatre arguments** en entrée :
 
 1. `ip_source` → L’adresse IP que l’on veut usurper.  
 2. `mac_source` → L’adresse MAC qui sera associée à cette IP (spoofée).  
-3. `ip_cible` → L’adresse IP de la cible (l’appareil que l’on veut tromper).  
+3. `ip_cible` → L’adresse IP de la cible (l’appareil que l’on veut tromper).
 4. `mac_cible` → L’adresse MAC de la cible.
+5. `mac_routeur` → L’adresse MAC réelle du routeur/gateway.
 
 ### Exécution du programme
 
 La commande suivante permet d’exécuter le programme :
 
 ```sh
-./ft_malcolm <ip_source> <mac_source> <ip_cible> <mac_cible>
+./ft_malcolm <ip_source> <mac_source> <ip_cible> <mac_cible> <mac_routeur>
 ```
+
+Le programme réalise désormais un **double ARP spoofing** : il trompe à la fois
+la victime et le routeur en envoyant deux réponses ARP falsifiées. Après
+l'empoisonnement, il affiche quelques paquets IP interceptés afin de montrer les
+données récupérées.
 
 ## Récupération et envoi des informations en C
 

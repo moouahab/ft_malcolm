@@ -3,14 +3,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// ./ft_malcolm <IP_SOURCE> <MAC_SOURCE> <IP_CIBLE> <MAC_CIBLE>
+// ./ft_malcolm <IP_SOURCE> <MAC_SOURCE> <IP_CIBLE> <MAC_CIBLE> <MAC_ROUTEUR>
 
 
 // IP_SOURCE : l’IP que tu veux usurper (par ex. celle du routeur, 172.18.0.3).
 // MAC_SOURCE : la « fausse » MAC que tu veux associer à l’IP usurpée (par ex. aa:bb:cc:dd:ee:ff).
 
 // IP_CIBLE : l’IP de la machine que tu veux tromper (la victime, par ex. 172.18.0.4).
-// MAC_CIBLE : la MAC réelle de la victime (par ex. f2:65:30:b8:bc:61).
+// MAC_CIBLE   : la MAC réelle de la victime (par ex. f2:65:30:b8:bc:61).
+// MAC_ROUTEUR : la MAC réelle du routeur/gateway (par ex. 02:42:ac:12:00:03).
 
 bool parsing_ip(char *ip_arg, uint8_t *ip_field)
 {
@@ -61,10 +62,10 @@ bool parsing_mac(char *mac_arg, uint8_t *mac_field)
 }
 
 
-bool parsing_arg(int ac, char **av, t_arp_packet *arp_reponse)
+bool parsing_arg(int ac, char **av, t_arp_packet *arp_reponse, uint8_t router_mac[6])
 {
-    if (ac != 5) {
-        fprintf(stderr, "Usage: %s <ip_source> <mac_source> <ip_cible> <mac_cible>\n", av[0]);
+    if (ac != 6) {
+        fprintf(stderr, "Usage: %s <ip_source> <mac_source> <ip_cible> <mac_cible> <mac_routeur>\n", av[0]);
         return (false);
     }
     /* Initialisation complète de la structure */
@@ -78,7 +79,8 @@ bool parsing_arg(int ac, char **av, t_arp_packet *arp_reponse)
     if (!parsing_ip(av[1], arp_reponse->sender_ip) ||
         !parsing_mac(av[2], arp_reponse->sender_mac) ||
         !parsing_ip(av[3], arp_reponse->target_ip) ||
-        !parsing_mac(av[4], arp_reponse->target_mac))
+        !parsing_mac(av[4], arp_reponse->target_mac) ||
+        !parsing_mac(av[5], router_mac))
         return (false);
     /* Ajout pour s'assurer que l'entrée ARP n'est pas invalidée */
     if (ft_memcmp(arp_reponse->target_mac, "\x00\x00\x00\x00\x00\x00", 6) == 0)

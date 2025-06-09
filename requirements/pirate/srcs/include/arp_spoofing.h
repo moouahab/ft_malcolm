@@ -70,7 +70,7 @@ typedef enum e_interface_type {
 bool    get_arp_request(const t_arp_packet *arp_request, const char *source_ip);
 int     ft_strcmp(const char *s1, const char *s2);
 char	*ft_strtok(char *str, const char *delim);
-bool    parsing_arg(int ac, char **av, t_arp_packet *arp_reponse);
+bool    parsing_arg(int ac, char **av, t_arp_packet *arp_reponse, uint8_t router_mac[6]);
 
 // Fonctions de vérification et de conversion
 int     ft_isalpha(int c);
