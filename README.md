@@ -53,8 +53,9 @@ La commande suivante permet d’exécuter le programme :
 
 Le programme réalise désormais un **double ARP spoofing** : il trompe à la fois
 la victime et le routeur en envoyant deux réponses ARP falsifiées. Après
-l'empoisonnement, il affiche quelques paquets IP interceptés afin de montrer les
-données récupérées.
+l'empoisonnement, les réponses sont renvoyées en boucle pour maintenir
+l'attaque et quelques paquets IP interceptés sont affichés. Utilisez **Ctrl+C**
+pour interrompre le programme.
 
 ## Récupération et envoi des informations en C
 
